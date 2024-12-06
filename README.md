@@ -2,7 +2,7 @@
 
 ## Issue Description
 
-When attempting to load a map through Azure maps when using turbopack, the map fails to load, either altogether (showin in this repo) or when applying tiles (which is occurring in my organization's actual codebase, but isn't sharable).
+When attempting to load a map through Azure maps when using turbopack, the map fails to load, either altogether (shown in this repo) or when applying tiles (which is occurring in my organization's actual codebase, but isn't sharable).
 
 Failing at tile application: ![alt text](image-2.png)
 
