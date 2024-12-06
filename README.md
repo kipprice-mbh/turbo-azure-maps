@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Azure Maps Issue in Turbopack
 
-## Getting Started
+## Issue Description
 
-First, run the development server:
+When attempting to load a map through Azure maps when using turbopack, the map fails to load, either altogether (showin in this repo) or when applying tiles (which is occurring in my organization's actual codebase, but isn't sharable).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Failing at tile application: ![alt text](image-2.png)
+
+This only happens within turbopack, and appears to be an issue with how a recursive function is compiled.
+
+## Steps to Reproduce
+
+1. Set up an account with [Azure Maps](https://azure.microsoft.com/en-us/products/azure-maps/) to get a subscription key
+2. Set an environment var named AZURE_SUBSCRIPTION_KEY to the subscription key you received from Azure
+3. Run `pnpm dev` and observe the map successfully loads
+4. Run `pnpm dev --turbo` and observe the map fail to load
+
+## Identified Issue
+
+I'm not sure if this is the root issue, but there is an initial issue in the turbopack build related to a recursive function in `azure-maps-control`.
+
+The original Azure code is the following:
+
+```js
+// azure-map-controls/dist/atlas-esm.js
+
+function leastBadBreaks(lastLineBreak) {
+  if (!lastLineBreak) {
+    return [];
+  }
+  return leastBadBreaks(lastLineBreak.priorBreak).concat(lastLineBreak.index);
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+As you can see, if the argument is falsey at any point in the recursive call tree, it does not attempt to continue to call `leastBadBreaks`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+This is what turbopack compiles this code to:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```js
+return function e(t) {
+    return ("TURBOPACK compile-time truthy", 1) ? e(t.priorBreak).concat(t.index) : ("TURBOPACK unreachable", undefined);
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This no longer actual uses the truthiness of the argument, and instead always tries to get the value of `t.priorBreak`; this is crashing because the value is sometimes null.
